@@ -31,6 +31,18 @@ Docker
 .. autoclass:: Docker
 
 
+NSpawn
+''''''
+
+.. autoclass:: NSpawn
+
+
+NSenter
+''''''
+
+.. autoclass:: NSenter
+
+
 Subprocess
 ''''''''''
 
