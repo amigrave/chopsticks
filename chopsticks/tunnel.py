@@ -1,4 +1,5 @@
 from __future__ import print_function
+import logging
 import subprocess
 import sys
 import os
@@ -503,12 +504,21 @@ class PipeTunnel(BaseTunnel):
         self.reader.start()
         self.writer.write_raw(bubble)
 
+        log_config = None
+        if logging.root.handlers:
+            log_config = dict(
+                format=logging.root.handlers[0].formatter._fmt,
+                datefmt=logging.root.handlers[0].formatter.datefmt,
+                level=min(logging.root.level, logging.INFO),
+            )
+
         self.write_msg(
             OP_START,
             req_id=0,
             host=self.host,
             path=path,
             depthlimit=chopsticks.DEPTH_LIMIT,
+            log_config=log_config,
         )
 
         self.errreader = ioloop.StderrReader(errloop, self.epipe, self.host)
