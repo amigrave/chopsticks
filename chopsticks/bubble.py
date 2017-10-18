@@ -337,10 +337,11 @@ class TunnelHandler(logging.Handler):
         debug(log_entry.strip())
 
 
-def handle_start(req_id, host, path, depthlimit, log_config):
+def handle_start(req_id, host, path, depthlimit, log_config, allow_site_imports=False):
     sys._chopsticks_host = force_str(host)
     sys._chopsticks_path = [force_str(p) for p in path]
     sys._chopsticks_depthlimit = depthlimit
+    sys._chopsticks_allow_site_imports = allow_site_imports
     send_msg(OP_RET, req_id, {'ret': pickle.HIGHEST_PROTOCOL})
 
     if log_config:

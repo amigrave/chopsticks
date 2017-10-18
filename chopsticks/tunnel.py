@@ -519,6 +519,7 @@ class PipeTunnel(BaseTunnel):
             path=path,
             depthlimit=chopsticks.DEPTH_LIMIT,
             log_config=log_config,
+            allow_site_imports=SubprocessTunnel._allow_site_imports(),
         )
 
         self.errreader = ioloop.StderrReader(errloop, self.epipe, self.host)
@@ -574,7 +575,7 @@ class SubprocessTunnel(PipeTunnel):
 
     #: These arguments are used for bootstrapping Python into out remote agent
     PYTHON_ARGS = [
-        '-usS',
+        '-u',
         '-c',
         'import sys, os; _bsz = %d ;' % len(bubble) +
         'inpipe = os.fdopen(os.dup(0), \'rb\', _bsz); ' +
@@ -601,9 +602,20 @@ class SubprocessTunnel(PipeTunnel):
         self.rpipe = self.proc.stdout
         self.epipe = self.proc.stderr
 
+    @staticmethod
+    def _allow_site_imports():
+        if os.environ.get('CHOPSTICKS_ALLOW_SITE_IMPORTS') == '1':
+            return True
+        if getattr(sys, '_chopsticks_allow_site_imports', False):
+            return True
+        return getattr(chopsticks, 'allow_site_imports', False)
+
     def cmd_args(self):
         python = self.python2 if PY2 else self.python3
-        return [python] + self.PYTHON_ARGS
+        args = self.PYTHON_ARGS.copy()
+        if not self._allow_site_imports():
+            args.insert(0, '-sS')
+        return [python] + args
 
 
 class Local(SubprocessTunnel):
