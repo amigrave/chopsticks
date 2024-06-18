@@ -44,10 +44,11 @@ else:
     from queue import Queue
     import pickle
     exec_ = getattr(__builtins__, 'exec')
-from imp import is_builtin
+from _imp import is_builtin
+from importlib import _bootstrap
 import time
 import struct
-import imp
+import types
 from collections import namedtuple
 import signal
 from hashlib import sha1
@@ -133,6 +134,16 @@ class Loader:
             return None
         return self
 
+    # Borrowed from Python3.11 deprecated behavior
+    def find_spec(self, fullname, path=None, target=None):
+        loader = self.find_module(fullname, path=path)
+        portions = []
+        if loader is not None:
+            return _bootstrap.spec_from_loader(fullname, loader)
+        spec = _bootstrap.ModuleSpec(fullname, None)
+        spec.submodule_search_locations = portions
+        return spec
+
     def load_module(self, fullname):
         m = self.get(fullname)
         modname = fullname
@@ -140,7 +151,7 @@ class Loader:
             # Special-case __main__ so as not to execute
             # if __name__ == '__main__' blocks
             modname = '__chopsticks_main__'
-        mod = sys.modules.setdefault(modname, imp.new_module(modname))
+        mod = sys.modules.setdefault(modname, types.ModuleType(modname))
         mod.__file__ = PREFIX + m.file
         mod.__loader__ = self
         if m.is_pkg:
