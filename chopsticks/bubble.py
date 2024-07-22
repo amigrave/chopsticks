@@ -75,7 +75,7 @@ class Loader:
     # Imports that don't succeed after this amount of time will time out
     # This can help crash a remote process when the controller hangs, thus
     # breaking the deadlock.
-    TIMEOUT = 5  # seconds
+    TIMEOUT = 10  # seconds
 
     cache = {}
     lock = threading.RLock()
