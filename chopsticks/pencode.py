@@ -144,10 +144,17 @@ class PDecoder(object):
     def decode(self, buf):
         return self._decode(obuf(buf))
 
-    def _decode(self, obuf):
-        br_id = self.br_count
-        self.br_count += 1
+    def _backref(self, obj, force_id=None):
+        if force_id:
+            self.backrefs[force_id] = obj
+            return force_id
+        elif obj is not None:
+            self.backrefs[self.br_count] = obj
+            self.br_count += 1
+            return self.br_count - 1
+        return False
 
+    def _decode(self, obuf):
         code = obuf.read_bytes(1)
         if code == b'n':
             obj = None
@@ -173,30 +180,36 @@ class PDecoder(object):
         elif code == b'l':
             sz = obuf.read_size()
             obj = []
-            self.backrefs[br_id] = obj
+            self._backref(obj)
             obj.extend(self._decode(obuf) for _ in range_(sz))
+            return obj
         elif code == b'q':
             sz = obuf.read_size()
             obj = set()
-            self.backrefs[br_id] = obj
+            self._backref(obj)
             obj.update(self._decode(obuf) for _ in range_(sz))
+            return obj 
         elif code in (b't', b'Q'):
             cls = tuple if code == b't' else frozenset
             sz = obuf.read_size()
+            frozen_id = self._backref(cls())
             obj = cls(self._decode(obuf) for _ in range_(sz))
+            self._backref(obj, force_id=frozen_id)
         elif code == b'd':
             sz = obuf.read_size()
             obj = {}
-            self.backrefs[br_id] = obj
+            self._backref(obj)
             for _ in range_(sz):
                 key = self._decode(obuf)
                 value = self._decode(obuf)
                 obj[key] = value
+            return obj
         elif code == b'R':
             ref_id = obuf.read_size()
             obj = self.backrefs[ref_id]
+            return obj
         else:
             raise ValueError('Unknown pack opcode %r' % code)
 
-        self.backrefs[br_id] = obj
+        self._backref(obj)
         return obj

@@ -192,6 +192,14 @@ class BaseTunnel(SetOps):
         with open(file, 'rb') as f:
             return Bytes(f.read())
 
+    @classmethod
+    def _read_variables(cls, mod):
+        ''' Function to be used to pass static variables from the host to the remote (e.g. compilation of YAML file into Python object).
+            The computation is done on the host side when the remote loads for the first the module (afterward, chopsticks will cache it).
+            These variables will be injected into the targetted module __dict__. 
+        '''
+        return {}
+
     def handle_imp(self, mod):
         key = mod
         fname = None
@@ -206,7 +214,8 @@ class BaseTunnel(SetOps):
                 exists=True,
                 is_pkg=False,
                 file=os.path.basename(path),
-                source=self._read_source(path)
+                source=self._read_source(path),
+                variables=self._read_variables(mod),
             )
             return
         elif isinstance(mod, tuple):
@@ -240,6 +249,7 @@ class BaseTunnel(SetOps):
                         is_pkg=imp.is_pkg,
                         file=imp.file,
                         source=imp.source,
+                        variables=imp.variables,
                     )
                     return
 
@@ -260,7 +270,8 @@ class BaseTunnel(SetOps):
                         exists=True,
                         is_pkg=is_pkg,
                         file=rel,
-                        source=self._read_source(path)
+                        source=self._read_source(path),
+                        variables=self._read_variables(mod),
                     )
                     return
         self.write_msg(
@@ -270,7 +281,8 @@ class BaseTunnel(SetOps):
             exists=False,
             is_pkg=False,
             file=None,
-            source=''
+            source='',
+            variables=None,
         )
 
     def _get_callback(self, req_id, data):
