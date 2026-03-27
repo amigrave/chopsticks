@@ -26,3 +26,11 @@ def check_output(*args, **kwargs):
 def output_lines(*args, **kwargs):
     """Return the lines of output from the given command args."""
     return check_output(*args, **kwargs).splitlines()
+
+
+def get_inception_level():
+    try:
+        path = sys._chopsticks_path[:]
+    except AttributeError:
+        path = []
+    return len(path)

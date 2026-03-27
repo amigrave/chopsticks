@@ -75,7 +75,7 @@ def iter_opcodes(code):
             yield (op, arg)
 
 
-def serialise_func(f, seen=()):
+def serialise_func(f, seen=(), variables=None, imported_names=None):
     """Serialise a function defined in __main__ to be called remotely."""
     source = inspect.getsource(f)
 
@@ -85,8 +85,10 @@ def serialise_func(f, seen=()):
     code = compile(source, '<main>', 'exec')
     names = trace_globals(code)
 
-    imported_names = {}
-    variables = {}
+    if imported_names is None:
+        imported_names = {}
+    if variables is None:
+        variables = {}
 
     fglobals = f.func_globals if PY2 else f.__globals__
     for name in names:
@@ -101,7 +103,8 @@ def serialise_func(f, seen=()):
             if v in seen:
                 continue
             else:
-                subdeps = serialise_func(v, seen=seen + (f, v,))
+                subdeps = serialise_func(v, seen=seen + (f, v,), variables=variables,
+                                         imported_names=imported_names)
                 vsource, _, _, vnames, vvars = subdeps
                 source = vsource + '\n\n' + source
                 imported_names.update(vnames)
