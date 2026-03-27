@@ -843,7 +843,7 @@ class SSHTunnel(SubprocessTunnel):
         if self.user:
             args.extend(['-l', self.user])
         if self.port:
-            args.extend(['-p', self.port])
+            args.extend(['-p', str(self.port)])
         args.append(self.host)
         if self.sudo:
             args.append('sudo')
