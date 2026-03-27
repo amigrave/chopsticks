@@ -29,10 +29,16 @@ def trace_globals(code):
     LOAD_GLOBAL = dis.opmap['LOAD_GLOBAL']
     LOAD_NAME = dis.opmap['LOAD_NAME']
     global_ops = (LOAD_GLOBAL, LOAD_NAME)
+
+    # In Python 3.11+, LOAD_GLOBAL arg encodes the index as arg >> 1
+    # (lowest bit indicates whether to push NULL before the value)
+    load_global_shift = sys.version_info >= (3, 11)
+
     loads = set()
     for op, arg in iter_opcodes(code.co_code):
         if op in global_ops:
-            loads.add(code.co_names[arg])
+            idx = arg >> 1 if (op == LOAD_GLOBAL and load_global_shift) else arg
+            loads.add(code.co_names[idx])
     for c in code.co_consts:
         if isinstance(c, types.CodeType):
             loads.update(trace_globals(c))
