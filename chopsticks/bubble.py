@@ -11,6 +11,13 @@ def debug(msg):
 
 # Reshuffle fds so that we can't break our transport by printing to stdout
 import os
+# Remove project source dirs from sys.path (e.g. from 'pip install -e .').
+# These are directories that contain a setup.py or pyproject.toml at the root,
+# which can shadow modules that should be fetched from the controller via OP_IMP.
+# Legitimate installed packages live in site-packages, not in source trees.
+sys.path = [p for p in sys.path
+            if not os.path.isfile(os.path.join(p, 'setup.py'))
+            and not os.path.isfile(os.path.join(p, 'pyproject.toml'))]
 # inpipe is defined in the bootstrap command line code in tunnel.py
 outfd = os.dup(1)
 outpipe = os.fdopen(outfd, 'wb', 0)

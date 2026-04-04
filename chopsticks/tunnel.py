@@ -267,6 +267,45 @@ class BaseTunnel(SetOps):
                         source=self._read_source(path)
                     )
                     return
+        # Fallback: use importlib to locate modules not directly findable
+        # via sys.path traversal (e.g. modern editable installs that register
+        # via .pth / importlib.metadata without adding the source dir to sys.path).
+        try:
+            import importlib.util as _ilu
+            import os.path as _op
+            _spec = _ilu.find_spec(mod)
+            if _spec and _spec.origin and not _spec.origin.endswith(('.so', '.pyd')):
+                if fname:
+                    # Package data file (e.g. pkgutil.get_data): locate it
+                    # next to the package directory found via importlib.
+                    _pkg_dir = (list(_spec.submodule_search_locations)[0]
+                                if _spec.submodule_search_locations
+                                else _op.dirname(_spec.origin))
+                    _data_path = _op.join(_pkg_dir, fname)
+                    if _op.exists(_data_path):
+                        self.write_msg(
+                            OP_IMP, 0,
+                            mod=key,
+                            exists=True,
+                            is_pkg=False,
+                            file=stem + '/' + fname,
+                            source=self._read_source(_data_path)
+                        )
+                        return
+                else:
+                    _is_pkg = bool(_spec.submodule_search_locations)
+                    _rel = stem + ('/__init__.py' if _is_pkg else '.py')
+                    self.write_msg(
+                        OP_IMP, 0,
+                        mod=key,
+                        exists=True,
+                        is_pkg=_is_pkg,
+                        file=_rel,
+                        source=self._read_source(_spec.origin)
+                    )
+                    return
+        except Exception:
+            pass
         self.write_msg(
             OP_IMP,
             0,
