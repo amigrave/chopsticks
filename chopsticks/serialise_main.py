@@ -77,7 +77,8 @@ def iter_opcodes(code):
     else:
         # More recent Python 3 has a function for this, though it is
         # not a public API.
-        for _, op, arg in unpack_opargs(code):
+        for item in unpack_opargs(code):
+            op, arg = item[-2], item[-1]
             yield (op, arg)
 
 
