@@ -825,17 +825,20 @@ class SSHTunnel(SubprocessTunnel):
                  not ``ssh`` directly as the root user.
 
     """
-    def __init__(self, host, user=None, port=None, sudo=False, host_check=True, forward_agent=True):
+    def __init__(self, host, user=None, port=None, sudo=False, host_check=True, forward_agent=True, connect_timeout=10):
         self.host = host
         self.user = user
         self.port = port
         self.sudo = sudo
         self.host_check = host_check
         self.forward_agent = forward_agent
+        self.connect_timeout = connect_timeout
         super(SubprocessTunnel, self).__init__()
 
     def cmd_args(self):
         args = ['ssh', '-o', 'PasswordAuthentication=no']
+        if self.connect_timeout:
+            args += ['-o', 'ConnectTimeout=%d' % self.connect_timeout]
         if self.forward_agent:
             args.append('-A')
         if not self.host_check:
