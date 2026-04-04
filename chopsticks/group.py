@@ -119,6 +119,8 @@ class Group(SetOps):
         for t in tunnels:
             m = getattr(t, method)
             m(self.op.make_callback(t.host), *args, **kwargs)
+        if self.op.waiting == 0:
+            return GroupResult(self.op.results)
         try:
             return loop.run()
         except:
