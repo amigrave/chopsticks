@@ -1,4 +1,5 @@
 from __future__ import print_function
+import base64
 import logging
 import contextlib
 import subprocess
@@ -113,13 +114,16 @@ class DepthLimitExceeded(Exception):
 
 # Load/construct the bubble code
 try:
-    # If this is the remote side, we have the bubble code in __main__.__bubble
     bubble = sys.modules['__main__'].__bubble
 except (AttributeError, KeyError):
     pencode_bubble = pkgutil.get_data('chopsticks', 'pencode.py')
     bubble = pkgutil.get_data('chopsticks', 'bubble.py')
     bubble = bubble.replace(b'{{ PENCODE }}', pencode_bubble)
     del pencode_bubble
+
+# Base64-encode the bubble for safe transmission over text-mode stdin.
+# This avoids UnicodeDecodeError on remotes regardless of bubble content.
+bubble_b64 = base64.b64encode(bubble)
 
 
 class BaseTunnel(SetOps):
@@ -530,7 +534,7 @@ class PipeTunnel(BaseTunnel):
         self.callbacks[0] = wrapped_callback
 
         self.reader.start()
-        self.writer.write_raw(bubble)
+        self.writer.write_raw(bubble_b64)
 
         log_config = None
         if logging.root.handlers:
@@ -605,9 +609,9 @@ class SubprocessTunnel(PipeTunnel):
     PYTHON_ARGS = [
         '-u',
         '-c',
-        'import sys, os; _bsz = %d ;' % len(bubble) +
+        'import sys, os, base64; _bsz = %d ;' % len(bubble_b64) +
         'inpipe = os.fdopen(os.dup(0), \'rb\', _bsz); ' +
-        '__bubble = sys.stdin.read(_bsz); ' +
+        '__bubble = base64.b64decode(sys.stdin.read(_bsz)); ' +
         'exec(compile(__bubble, \'bubble.py\', \'exec\'))'
     ]
 
