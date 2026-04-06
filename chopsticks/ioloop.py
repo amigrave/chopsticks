@@ -179,7 +179,11 @@ class StderrReader:
         self.loop.want_read(self.fd, self.on_data)
 
     def on_data(self):
-        chunk = os.read(self.fd, 512)
+        try:
+            chunk = os.read(self.fd, 512)
+        except OSError:
+            # fd was closed between select() and read() (e.g. tunnel closed)
+            chunk = None
         if not chunk:
             self._flush()
             return
@@ -280,9 +284,13 @@ class IOLoop:
             self.write.pop(x, None)
             reader = self.read.pop(x, None)
             if reader:
-                reader.errback('Error on stream')
+                errback = getattr(reader, 'errback', None)
+                if errback:
+                    errback('Error on stream')
         for r in rs:
-            self.read.pop(r)()
+            cb = self.read.pop(r, None)
+            if cb:
+                cb()
         for w in ws:
             self.write.pop(w)()
 
@@ -302,5 +310,6 @@ class IOLoop:
             self.running = True
             while self.running and (self.read or self.write):
                 self.step()
-        self.stop(self.result)
-        return self.result
+                result = self.result  # capture inside lock to avoid race with other threads
+        self.stop(result)
+        return result
