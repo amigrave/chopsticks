@@ -12,3 +12,15 @@ DEPTH_LIMIT = getattr(sys, '_chopsticks_depthlimit', 2)
 # This option can also be set via the CHOPSTICKS_ALLOW_SITE_IMPORTS environment
 # variable.
 allow_site_imports = False
+
+
+def get_current_function():
+    """Return the callable currently being executed by chopsticks on this remote.
+
+    Returns None if called outside of a chopsticks remote call or outside the
+    current thread's active call.
+    """
+    tl = getattr(sys, '_chopsticks_current_func', None)
+    if tl is None:
+        return None
+    return getattr(tl, 'value', None)

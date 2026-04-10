@@ -257,9 +257,18 @@ def do_fetch(req_id, path):
     }
 
 
+_current_func = threading.local()
+sys._chopsticks_current_func = _current_func
+
+
 @transmit_errors
 def do_call(req_id, callable, args=(), kwargs={}):
-    ret = callable(*args, **kwargs)
+    prev = getattr(_current_func, 'value', None)
+    _current_func.value = callable
+    try:
+        ret = callable(*args, **kwargs)
+    finally:
+        _current_func.value = prev
     send_msg(
         OP_RET,
         req_id,
