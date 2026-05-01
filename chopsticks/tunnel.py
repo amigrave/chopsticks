@@ -29,7 +29,30 @@ else:
 __metaclass__ = type
 
 # One global loop for all tunnels
-loop = ioloop.IOLoop()
+_loop_local = threading.local()
+
+
+class _ThreadLocalLoopProxy:
+    """Proxy that gives each thread its own IOLoop instance.
+
+    concurrent tunnel.call() from multiple threads must not share a single
+    IOLoop: the loop is not re-entrant and would deadlock when two threads
+    both try to run it at once.  Making it thread-local means each worker
+    thread drives its own loop independently.
+    """
+    def _get(self):
+        if not hasattr(_loop_local, 'loop'):
+            _loop_local.loop = ioloop.IOLoop()
+        return _loop_local.loop
+
+    def __getattr__(self, name):
+        return getattr(self._get(), name)
+
+    def __setattr__(self, name, value):
+        setattr(self._get(), name, value)
+
+
+loop = _ThreadLocalLoopProxy()
 
 # Another thread will output stderr
 errloop = ioloop.IOLoop()
