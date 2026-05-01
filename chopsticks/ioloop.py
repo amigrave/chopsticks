@@ -4,8 +4,9 @@ import os
 import fcntl
 import struct
 import weakref
-from threading import RLock
+import select as _select_module
 from select import select
+from threading import RLock
 
 from .pencode import pencode, pdecode
 
@@ -277,10 +278,7 @@ class IOLoop:
         if self.running:
             self.os_write(self.breakw, b'x')
 
-    def step(self):
-        rfds = list(self.read) + [self.breakr]
-        wfds = list(self.write)
-        rs, ws, xs = select(rfds, wfds, rfds + wfds)
+    def _dispatch(self, rs, ws, xs):
         if self.breakr in rs:
             rs.remove(self.breakr)
             self.os_read(self.breakr, 512)
@@ -297,6 +295,54 @@ class IOLoop:
                 cb()
         for w in ws:
             self.write.pop(w)()
+
+    if hasattr(_select_module, 'poll'):
+        def step(self):
+            rfds = list(self.read) + [self.breakr]
+            wfds = list(self.write)
+            p = _select_module.poll()
+            fd_flags = {}
+            for fd in rfds:
+                fd_flags[fd] = fd_flags.get(fd, 0) | _select_module.POLLIN
+            for fd in wfds:
+                fd_flags[fd] = fd_flags.get(fd, 0) | _select_module.POLLOUT
+            for fd, flags in fd_flags.items():
+                p.register(fd, flags)
+            try:
+                events = p.poll(1000)
+            except OSError:
+                for fd in rfds + wfds:
+                    try:
+                        _select_module.select([fd], [], [], 0)
+                    except OSError:
+                        self.read.pop(fd, None)
+                        self.write.pop(fd, None)
+                return
+            rs, ws, xs = [], [], []
+            for fd, event in events:
+                if event & (_select_module.POLLERR | _select_module.POLLNVAL):
+                    xs.append(fd)
+                else:
+                    if event & (_select_module.POLLIN | _select_module.POLLHUP):
+                        rs.append(fd)
+                    if event & _select_module.POLLOUT:
+                        ws.append(fd)
+            self._dispatch(rs, ws, xs)
+    else:
+        def step(self):
+            rfds = list(self.read) + [self.breakr]
+            wfds = list(self.write)
+            try:
+                rs, ws, xs = select(rfds, wfds, rfds + wfds)
+            except OSError:
+                for fd in rfds + wfds:
+                    try:
+                        _select_module.select([fd], [], [], 0)
+                    except OSError:
+                        self.read.pop(fd, None)
+                        self.write.pop(fd, None)
+                return
+            self._dispatch(rs, ws, xs)
 
     def reader(self, *args, **kwargs):
         return MessageReader(self, *args, **kwargs)
