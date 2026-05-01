@@ -565,6 +565,10 @@ class PipeTunnel(BaseTunnel):
 
     """
 
+    def __init__(self):
+        self.errreader = None
+        super().__init__()
+
     def _connect_async(self, callback):
         if self.connected:
             callback(None)
@@ -635,6 +639,8 @@ class PipeTunnel(BaseTunnel):
     def close(self):
         if not self.connected:
             return
+        if self.errreader:
+            self.errreader.stop()
         self.wpipe.close()  # Terminate child
         self.reader.stop()
         self.writer.stop()

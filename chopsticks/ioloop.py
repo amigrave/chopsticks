@@ -181,19 +181,24 @@ class StderrReader:
         self.fd = nonblocking_fd(fd)
         self.host = host
         self.buf = b''
+        # Initialize these before registering the reader.
+        self._reregister_lock = RLock()
+        self._stopped = False
         self.loop.want_read(self.fd, self.on_data)
 
     def on_data(self):
+        # Keep re-registration in sync with stop().
         try:
             chunk = os.read(self.fd, 512)
         except OSError:
-            # fd was closed between select() and read() (e.g. tunnel closed)
             chunk = None
         if not chunk:
             self._flush()
             return
         self.buf += chunk
-        self.loop.want_read(self.fd, self.on_data)
+        with self._reregister_lock:
+            if not self._stopped:
+                self.loop.want_read(self.fd, self.on_data)
         self._check()
 
     def println(self, l):
@@ -220,7 +225,9 @@ class StderrReader:
             self.buf = b''
 
     def stop(self):
-        self.loop.abort_read(self.fd)
+        with self._reregister_lock:
+            self._stopped = True
+            self.loop.abort_read(self.fd)
         self._flush()
 
     def __del__(self):
