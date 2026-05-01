@@ -81,7 +81,7 @@ class Loader:
     # Imports that don't succeed after this amount of time will time out
     # This can help crash a remote process when the controller hangs, thus
     # breaking the deadlock.
-    TIMEOUT = 10  # seconds
+    TIMEOUT = 15  # seconds
 
     cache = {}
     lock = threading.RLock()
@@ -106,20 +106,18 @@ class Loader:
                 return self.cache[fullname]
             send_msg(OP_IMP, 0, {'imp': fullname})
             start = time.time()
-            self.ev.wait(timeout=self.TIMEOUT)
-            delay = time.time() - start
-            if delay >= self.TIMEOUT:
-                raise IOError(
-                    'Timed out after %ds waiting for import %r'
-                    % (self.TIMEOUT, fullname)
-                )
-            try:
-                imp = self.cache[fullname]
-            except KeyError:
-                raise IOError(
-                    'Did not find %s in %s' % (fullname, self.cache)
-                )
-        return imp
+            # Loop on ev.wait(): notifyAll() wakes ALL waiting threads on any
+            # module arrival, not just the one this thread needs.  Keep waiting
+            # until our specific module appears or the timeout expires.
+            while fullname not in self.cache:
+                remaining = self.TIMEOUT - (time.time() - start)
+                if remaining <= 0:
+                    raise IOError(
+                        'Timed out after %ds waiting for import %r'
+                        % (self.TIMEOUT, fullname)
+                    )
+                self.ev.wait(timeout=remaining)
+            return self.cache[fullname]
 
     def get(self, fullname):
         if isinstance(fullname, str) and is_builtin(fullname) != 0:

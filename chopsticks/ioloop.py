@@ -140,6 +140,10 @@ class MessageWriter:
             return
         try:
             written = os.write(self.fd, self.queue[0])
+        except BlockingIOError:
+            # Pipe full (EAGAIN) — leave data in queue and retry on next write event
+            self.loop.want_write(self.fd, self.on_write)
+            return
         except OSError:
             # TODO: handle errors properly
             import traceback
@@ -193,7 +197,7 @@ class StderrReader:
 
     def println(self, l):
         if not PY2:
-            l = l.decode('utf8')
+            l = l.decode('utf8', errors='replace')
         if sys.stderr.isatty():
             fmt = '\x1b[31m[{host}]\x1b[0m {l}'
         else:
@@ -308,6 +312,7 @@ class IOLoop:
         with self.lock:
             self.result = None
             self.running = True
+            result = None
             while self.running and (self.read or self.write):
                 self.step()
                 result = self.result  # capture inside lock to avoid race with other threads
