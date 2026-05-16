@@ -678,8 +678,8 @@ class SubprocessTunnel(PipeTunnel):
         '-u',
         '-c',
         'import sys, os, base64; _bsz = %d ;' % len(bubble_b64) +
-        'inpipe = os.fdopen(os.dup(0), \'rb\', _bsz); ' +
-        '__bubble = base64.b64decode(sys.stdin.read(_bsz)); ' +
+        'inpipe = os.fdopen(os.dup(0), \'rb\', 8192); ' +
+        '__bubble = base64.b64decode(inpipe.read(_bsz)); ' +
         'exec(compile(__bubble, \'bubble.py\', \'exec\'))'
     ]
 
