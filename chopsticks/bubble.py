@@ -190,6 +190,23 @@ sys.path.append(PREFIX)
 sys.path_hooks.append(Loader)
 
 
+class ControllerImporter:
+    """Give explicitly selected modules priority over remote installations."""
+
+    def __init__(self, names):
+        self.names = names
+        self.loader = Loader(PREFIX)
+
+    def find_spec(self, fullname, path=None, target=None):
+        if not any(fullname == name or fullname.startswith(name + '.')
+                   for name in self.names):
+            return None
+        # A missing selected module must fail, not silently use stale remote
+        # code. Explicit selection also takes priority over local_imports().
+        self.loader.get(fullname)
+        return _bootstrap.spec_from_loader(fullname, self.loader)
+
+
 def transmit_errors(func):
     def wrapper(req_id, *args, **kwargs):
         try:
@@ -369,11 +386,16 @@ class TunnelHandler(logging.Handler):
         debug(log_entry.strip())
 
 
-def handle_start(req_id, host, path, depthlimit, log_config, allow_site_imports=False):
+def handle_start(req_id, host, path, depthlimit, log_config,
+                 allow_site_imports=False, controller_imports=()):
     sys._chopsticks_host = force_str(host)
     sys._chopsticks_path = [force_str(p) for p in path]
     sys._chopsticks_depthlimit = depthlimit
     sys._chopsticks_allow_site_imports = allow_site_imports
+    names = tuple(force_str(name) for name in controller_imports)
+    sys._chopsticks_controller_imports = names
+    if names:
+        sys.meta_path.insert(0, ControllerImporter(names))
     send_msg(OP_RET, req_id, {'ret': pickle.HIGHEST_PROTOCOL})
 
     if log_config:

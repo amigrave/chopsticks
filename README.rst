@@ -104,6 +104,41 @@ calling ``connect()``). They are also usable as context managers:
 Naturally, any remote state (imports, globals, etc) is lost when the
 Tunnel/Group is closed.
 
+Choosing where imports come from
+--------------------------------
+
+To use dependencies installed on the remote host while always serving your own
+code from the controller (the computer running Chopsticks), configure:
+
+.. code:: bash
+
+    export CHOPSTICKS_ALLOW_SITE_IMPORTS=1
+    export CHOPSTICKS_CONTROLLER_IMPORTS=my_package,my_other_package
+
+Alternatively, configure these options in Python before connecting:
+
+.. code:: python
+
+    import chopsticks
+
+    chopsticks.allow_site_imports = True
+    chopsticks.controller_imports = ['my_package', 'my_other_package']
+
+Use Python import names, not repository names or filesystem paths. Each selected
+name includes all its submodules. Dotted names are also supported.
+Unselected imports retain their normal behavior, so dependencies such as ``requests``
+can use the remote installation.
+
+Selected modules are loaded through the tunnel before consulting remote import
+finders, including inside ``local_imports()``. If a selected module is unavailable
+on the controller, the import fails instead of using the remote copy. Environment
+and Python selections are combined and propagated through chains of tunnels;
+relays forward selected source requests to the original controller.
+
+As with normal Python imports, modules already loaded in a process remain cached.
+Use a fresh tunnel to pick up source changes or configuration changes. This option
+does not replace modules loaded during Python startup before the agent is ready.
+
 Installation
 ------------
 

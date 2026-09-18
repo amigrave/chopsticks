@@ -247,9 +247,19 @@ class BaseTunnel(SetOps):
             (False, stem + '.py'),
         ]
 
-        for root in sys.path:
+        roots = sys.path
+        forced = getattr(sys, '_chopsticks_controller_imports', ())
+        if any(mod == name or mod.startswith(name + '.') for name in forced):
+            # In a relay, serve selected code from the original controller,
+            # rather than from the relay's own filesystem.
+            roots = [CHOPSTICKS_PREFIX]
+
+        for root in roots:
             if root == CHOPSTICKS_PREFIX:
-                importer = sys.path_importer_cache[root]
+                importer = sys.path_importer_cache.get(root)
+                if importer is None:
+                    import __bubble__
+                    importer = __bubble__.Loader(root)
                 if fname:
                     req = (mod, fname)
                 else:
@@ -618,6 +628,7 @@ class PipeTunnel(BaseTunnel):
             depthlimit=chopsticks.DEPTH_LIMIT,
             log_config=log_config,
             allow_site_imports=SubprocessTunnel._allow_site_imports(),
+            controller_imports=SubprocessTunnel._controller_imports(),
         )
 
         self.errreader = ioloop.StderrReader(errloop, self.epipe, self.host)
@@ -701,6 +712,16 @@ class SubprocessTunnel(PipeTunnel):
         self.wpipe = self.proc.stdin
         self.rpipe = self.proc.stdout
         self.epipe = self.proc.stderr
+
+    @staticmethod
+    def _controller_imports():
+        names = list(getattr(sys, '_chopsticks_controller_imports', ()))
+        configured = getattr(chopsticks, 'controller_imports', ())
+        if isinstance(configured, str):
+            configured = configured.split(',')
+        names.extend(configured)
+        names.extend(os.environ.get('CHOPSTICKS_CONTROLLER_IMPORTS', '').split(','))
+        return sorted(set(name.strip() for name in names if name.strip()))
 
     @staticmethod
     def _allow_site_imports():

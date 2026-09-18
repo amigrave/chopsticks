@@ -13,6 +13,11 @@ DEPTH_LIMIT = getattr(sys, '_chopsticks_depthlimit', 2)
 # variable.
 allow_site_imports = False
 
+# Always import these modules/packages (including descendants) from the
+# controller, even when the remote has its own copy installed.
+# Also configurable via CHOPSTICKS_CONTROLLER_IMPORTS (comma-separated).
+controller_imports = ()
+
 
 def get_current_function():
     """Return the callable currently being executed by chopsticks on this remote.
